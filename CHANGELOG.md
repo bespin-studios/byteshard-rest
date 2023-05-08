@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/byteshard/rest/compare/v1.0.1...v1.0.2) (2023-05-08)
+
+
+### Performance Improvements
+
+* add phpunit test action ([#1](https://github.com/byteshard/rest/issues/1)) ([41a6d96](https://github.com/byteshard/rest/commit/41a6d9618d12dd602317b851f606ad8fca2499b3))
+
 ## [1.0.1](https://github.com/byteshard/rest/compare/v1.0.0...v1.0.1) (2023-05-08)
 
 
