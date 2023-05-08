@@ -11,7 +11,7 @@ jobs:
       - name: PHPStan Static Analysis
         uses: php-actions/phpstan@v3
       - name: PHPUnit Tests
-        run: ./vendor/bin/phpunit tests
+        run: ./vendor/bin/phpunit tests --do-not-cache-result
   semrel:
     runs-on: ubuntu-latest
     steps:
