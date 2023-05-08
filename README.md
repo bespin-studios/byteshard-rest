@@ -1,17 +1,6 @@
 ## How to use
 
-add repository to composer.json
-
-```
-"repositories": [
-    {
-        "type": "composer",
-        "url": "https://satis.bespin-studios.com"
-    }
-]
-```
-
-install byteShard
+install byteShard/rest
 
 `composer require byteshard/rest`
 
