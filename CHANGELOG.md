@@ -1,3 +1,16 @@
+# [1.1.0](https://github.com/byteshard/rest/compare/v1.0.2...v1.1.0) (2024-03-15)
+
+
+### Bug Fixes
+
+* add composer.lock ([9c948ed](https://github.com/byteshard/rest/commit/9c948ed009dfad88975751d0be3c9fd131e04c57))
+* update github actions ([ee1af94](https://github.com/byteshard/rest/commit/ee1af9453734c471b0d16cb379a6e9a78ef82381))
+
+
+### Features
+
+* changes and a new RestEndpoint to better support swagger-php in projects ([448b399](https://github.com/byteshard/rest/commit/448b3998c8da03602939ab719ff7d3fe72df2865))
+
 ## [1.0.2](https://github.com/byteshard/rest/compare/v1.0.1...v1.0.2) (2023-05-08)
 
 
