@@ -23,4 +23,5 @@ enum RestMethod: string
     case POST = 'POST';
     case PUT = 'PUT';
     case PATCH = 'PATCH';
+    case OPTIONS = 'OPTIONS';
 }

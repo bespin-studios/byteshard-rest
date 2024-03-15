@@ -15,28 +15,62 @@ namespace byteShard;
 use byteShard\Enum\RestMethod;
 use byteShard\Rest\Location;
 use byteShard\Rest\Method;
+use byteShard\Rest\RangeInterface;
+use byteShard\Rest\RestEndpoint;
 use Exception;
+use Psr\Log\LoggerInterface;
 use stdClass;
 
 class Rest
 {
     private RestMethod $method;
     /** @var array<string, Location> */
-    private array  $locations = [];
-    private bool   $error     = false;
-    private string $errorMessage;
+    private array            $locations         = [];
+    private ?LoggerInterface $logger            = null;
+    private ?string          $authenticatedUser = null;
 
     /**
      * Rest constructor.
      * @throws Exception
      */
-    public function __construct()
+    public function __construct(?LoggerInterface $logger = null)
     {
         $method = RestMethod::tryFrom(strtoupper($_SERVER['REQUEST_METHOD']));
         if ($method === null) {
             throw new Exception('invalid HTTP method '.$_SERVER['REQUEST_METHOD'].' must one of "'.implode('", "', array_column(RestMethod::cases(), 'value')).'"');
         } else {
             $this->method = $method;
+        }
+        $this->logger            = $logger;
+        $this->authenticatedUser = $this->getBasicAuthUser();
+    }
+
+    /**
+     * @param array<mixed>|string|false $token
+     */
+    public function authorize(array|string|false $token): void
+    {
+        if (array_key_exists('HTTP_BEARER', $_SERVER)) {
+            $clientToken = $_SERVER['HTTP_BEARER'];
+        } elseif (array_key_exists('HTTP_AUTHORIZATION', $_SERVER)) {
+            $clientToken = substr($_SERVER['HTTP_AUTHORIZATION'], 7);
+        } else {
+            $this->logger?->alert('SECURITY: ['.$_SERVER['HTTP_X_REAL_IP'].'] invalid access.');
+            header("HTTP/1.1 401 Unauthorized");
+            exit;
+        }
+
+        //TODO: bearer backend so multiple tokens are supported
+        if (!is_string($token) || $token === '') {
+            $this->logger?->alert('SECURITY: bearer not found.');
+            header("HTTP/1.1 401 Unauthorized");
+            exit;
+        }
+
+        if ($clientToken !== $token) {
+            $this->logger?->alert('SECURITY: ['.$_SERVER['HTTP_X_REAL_IP'].'] unauthorized access.');
+            header("HTTP/1.1 401 Unauthorized");
+            exit;
         }
     }
 
@@ -62,92 +96,160 @@ class Rest
         return null;
     }
 
-    public function call(string $location): void
+    public function call(string $location, string $className = ''): never
+    {
+        if ($className === '' && isset($this->locations[$location]) && $this->locations[$location]->isTypeSupported($this->method)) {
+            $className = $this->locations[$location]->getClassName($this->method);
+        }
+        if (!empty($className)) {
+            if (is_subclass_of($className, Method::class)) {
+                $this->oldStyleCall($location, $className);
+            } elseif (is_subclass_of($className, RestEndpoint::class)) {
+                $this->newStyleCall($location, $className);
+            }
+        }
+        $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'unknown method'], httpResponseCode: 404);
+    }
+
+    private function oldStyleCall(string $location, string $className): void
     {
         header('Content-Type: application/json');
-        if (isset($this->locations[$location]) && $this->locations[$location]->isTypeSupported($this->method)) {
-            $className = $this->locations[$location]->getClassName($this->method);
-            if ($className !== null && is_subclass_of($className, Method::class)) {
-                if ($this->method === RestMethod::GET) {
-                    $parameters = $this->getGETParameters($location);
-                } else {
-                    $parameters = $this->getBodyParameters();
+        $parameters          = $this->getParameters($location, false);
+        $constructorCallback = $this->locations[$location]->getConstructorCallback($this->method);
+        if ($constructorCallback === null) {
+            $executeLocation = new $className();
+        } else {
+            $constructorParameters = $constructorCallback(['body' => $parameters, 'basic_auth_user' => $this->authenticatedUser]);
+            if (is_array($constructorParameters)) {
+                $executeLocation = new $className(...$constructorParameters);
+            } else {
+                $executeLocation = new $className($constructorParameters);
+            }
+        }
+        if ($executeLocation instanceof Method) {
+            $executeLocation->setRestMethod($this->method);
+            try {
+                $result = $executeLocation->run($parameters);
+                if ($result === null) {
+                    $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
                 }
-                $constructorCallback = $this->locations[$location]->getConstructorCallback($this->method);
-                if ($constructorCallback === null) {
-                    $executeLocation = new $className();
-                } else {
-                    $constructorParameters = $constructorCallback($parameters);
-                    if (is_array($constructorParameters)) {
-                        $executeLocation = new $className(...$constructorParameters);
+                $this->printClientResponse($result);
+            } catch (Exception $e) {
+                $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => $e->getMessage()], httpResponseCode: 404);
+            }
+        }
+    }
+
+    private function newStyleCall(string $location, string $className): void
+    {
+        $parameters = $this->getParameters($location, true);
+        try {
+            /** @var RestEndpoint $endpointObject */
+            $endpointObject = new $className(...$parameters);
+        } catch (Exception $e) {
+            $this->logger?->error($e->getMessage());
+            $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
+        }
+
+        $endpointObject->setLogger($this->logger);
+        $endpointObject->setAuthenticatedUser($this->authenticatedUser);
+        if ($endpointObject instanceof RangeInterface && array_key_exists('HTTP_RANGE', $_SERVER)) {
+            $rangePrefix = $endpointObject->getRangePrefix();
+            if (str_starts_with($_SERVER['HTTP_RANGE'], $rangePrefix.'=')) {
+                $range = substr($_SERVER['HTTP_RANGE'], strlen($rangePrefix) + 1);
+                //TODO: multipart ranges, check for commas
+                $dashCount = substr_count($range, '-');
+                if ($dashCount === 0) {
+                    $from = filter_var($range, FILTER_VALIDATE_INT);
+                    if ($from !== false) {
+                        $endpointObject->setRange($from);
+                    }
+                } elseif ($dashCount === 1) {
+                    if (str_starts_with($range, '-')) {
+                        $from = filter_var($range, FILTER_VALIDATE_INT);
+                        if ($from !== false) {
+                            $endpointObject->setRange($from);
+                        }
                     } else {
-                        $executeLocation = new $className($constructorParameters);
-                    }
-                }
-                if ($executeLocation instanceof Method) {
-                    $executeLocation->setRestMethod($this->method);
-                    if ($this->error === true) {
-                        print json_encode(['state' => 'error', 'errorMessage' => $this->errorMessage]);
-                        exit;
-                    }
-                    try {
-                        $result = $executeLocation->run($parameters['body']);
-                        if (is_string($result)) {
-                            print $result;
-                            exit;
+                        $parts = explode('-', $range);
+                        $from  = filter_var($parts[0], FILTER_VALIDATE_INT);
+                        $to    = filter_var($parts[1], FILTER_VALIDATE_INT);
+                        if ($from !== false && $to !== false && $from < $to) {
+                            $endpointObject->setRange($from, $to);
                         }
-                        if (is_array($result) || is_object($result)) {
-                            print json_encode($result);
-                            exit;
-                        }
-                        if ($result === null) {
-                            http_response_code(404);
-                            print json_encode(['state' => 'error', 'errorMessage' => 'an error occurred']);
-                            exit;
-                        }
-                    } catch (Exception $e) {
-                        print json_encode(['state' => 'error', 'errorMessage' => $e->getMessage()]);
-                        exit;
                     }
                 }
             }
-            print json_encode(['state' => 'error', 'errorMessage' => 'invalid method']);
-            exit;
         }
-        print json_encode(['state' => 'error', 'errorMessage' => 'unknown method']);
+        try {
+            $result = $endpointObject->run();
+            if ($result === null) {
+                $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
+            }
+            $this->printClientResponse(response: $result, contentType: $endpointObject->getContentType(), httpResponseCode: $endpointObject->getReturnCode());
+        } catch (Exception $e) {
+            $this->logger?->error($e->getMessage());
+            $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
+        }
+    }
+
+    private function getParameters(string $location, bool $newStyle): mixed
+    {
+        if ($this->method === RestMethod::GET) {
+            return $this->getGETParameters($location, $newStyle);
+        }
+        return $this->getBodyParameters($newStyle);
+    }
+
+    private function printClientResponse(mixed $response, string $contentType = 'application/json', int $httpResponseCode = 200): never
+    {
+        header('Content-Type: '.$contentType);
+        if (is_string($response)) {
+            http_response_code($httpResponseCode);
+            print $response;
+        } else {
+            $jsonResponse = json_encode($response);
+            if ($jsonResponse === false) {
+                http_response_code(500);
+                print 'Internal Server Error';
+            } else {
+                http_response_code($httpResponseCode);
+                print $jsonResponse;
+            }
+        }
         exit;
     }
 
-    /**
-     * @return array{body: null|object, basic_auth_user: null|string}
-     */
-    private function getGETParameters(string $location): array
+    private function getGETParameters(string $location, bool $getAssociativeArray = false): mixed
     {
         if (isset($_SERVER['QUERY_STRING'])) {
             parse_str($_SERVER['QUERY_STRING'], $bodyParameters);
             if (is_array($bodyParameters) && !empty($bodyParameters)) {
                 $locationFound = false;
-                $params        = new stdClass();
+                $params        = $getAssociativeArray ? [] : new stdClass();
                 foreach ($bodyParameters as $key => $value) {
                     if ($key === 'request' && $value === $location) {
                         $locationFound = true;
                     } else {
-                        $params->{$key} = $value;
+                        if ($getAssociativeArray === true && is_array($params)) {
+                            $params[$key] = $value;
+                        } else {
+                            $params->{$key} = $value;
+                        }
                     }
                 }
                 if ($locationFound === true) {
-                    return ['body' => $params, 'basic_auth_user' => $this->getBasicAuthUser()];
+                    return $params;
                 }
             }
         }
-        return ['body' => null, 'basic_auth_user' => $this->getBasicAuthUser()];
+        return null;
     }
 
     /**
      * Using mixed as body object since json_decode returns mixed
-     * @return array{body: mixed, basic_auth_user: null|string}
      */
-    private function getBodyParameters(): array
+    private function getBodyParameters(bool $getAssociativeArray = false): mixed
     {
         $contentType = '';
         if (isset($_SERVER['CONTENT_TYPE'])) {
@@ -156,17 +258,15 @@ class Rest
         $body = file_get_contents('php://input');
         if ($body !== false) {
             if (stripos($contentType, 'application/json') !== false) {
-                $json = json_decode($body);
+                $json = json_decode($body, $getAssociativeArray);
                 if ($json === null && strlen($body) > 0) {
-                    $this->error        = true;
-                    $this->errorMessage = 'invalid json payload';
-                    return ['body' => false, 'basic_auth_user' => $this->getBasicAuthUser()];
+                    $this->printClientResponse(['state' => 'error', 'errorMessage' => 'invalid json payload']);
                 }
-                return ['body' => $json, 'basic_auth_user' => $this->getBasicAuthUser()];
+                return $json;
             }
             if (stripos($contentType, 'application/x-www-form-urlencoded') !== false) {
                 parse_str($body, $bodyParameters);
-                return ['body' => $bodyParameters, 'basic_auth_user' => $this->getBasicAuthUser()];
+                return $bodyParameters;
             }
         }
         if (stripos($contentType, 'multipart/form-data') !== false) {
@@ -179,10 +279,9 @@ class Rest
                     $body[$name] = $value;
                 }
             }
-            return ['body' => $body, 'basic_auth_user' => $this->getBasicAuthUser()];
+            return $body;
         }
-        print json_encode(['state' => 'error', 'errorMessage' => 'invalid content type: '.$contentType]);
-        exit;
+        $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'invalid content type: '.$contentType], httpResponseCode: 415);
     }
 
     private function getBasicAuthUser(): ?string
