@@ -10,6 +10,11 @@ abstract class RestEndpoint
     protected ?LoggerInterface $log               = null;
     private int                $returnCode        = 200;
     private ?string            $authenticatedUser = null;
+    private int                $queryRangeFrom;
+    private int                $queryRangeTo;
+    private int                $resultRangeFrom;
+    private int                $resultRangeTo;
+    private int                $resultRangeCount;
 
     protected function setContentType(string $contentType): void
     {
@@ -47,4 +52,44 @@ abstract class RestEndpoint
     }
 
     abstract public function run(): mixed;
+
+    public function setQueryRange(int $from, ?int $to = null): void
+    {
+        $this->queryRangeFrom = $from;
+        if ($to !== null) {
+            $this->queryRangeTo = $to;
+        }
+    }
+
+    public function setResultRange(int $from, int $count, ?int $to = null): void
+    {
+        $this->resultRangeFrom  = $from;
+        $this->resultRangeCount = $count;
+        if ($to !== null) {
+            $this->resultRangeTo = $to;
+        }
+    }
+
+    protected function getQueryRangeFrom(): ?int
+    {
+        return $this->queryRangeFrom ?? null;
+    }
+
+    protected function getQueryRangeTo(): ?int
+    {
+        return $this->queryRangeTo ?? null;
+    }
+
+    public function setResponseRangeHeaders(): void
+    {
+        if ($this instanceof RangeInterface) {
+            header('Accept-Ranges: '.$this->getRangePrefix());
+            $range[] = $this->resultRangeFrom ?? 0;
+            $rangeTo = $this->resultRangeTo ?? (!isset($this->resultRangeFrom) ? $this->resultRangeCount - 1 : '');
+            if (!empty($rangeTo)) {
+                $range[] = $rangeTo;
+            }
+            header('Content-Range: documents '.implode('-', $range).'/'.$this->resultRangeCount);
+        }
+    }
 }
