@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/byteshard/rest/compare/v1.1.0...v1.1.1) (2024-04-09)
+
+
+### Bug Fixes
+
+* update query range implementation ([e1db6f2](https://github.com/byteshard/rest/commit/e1db6f279585159a51f38e2c9cc352b59f822ec6))
+
 # [1.1.0](https://github.com/byteshard/rest/compare/v1.0.2...v1.1.0) (2024-03-15)
 
 
