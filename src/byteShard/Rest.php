@@ -162,20 +162,20 @@ class Rest
                 if ($dashCount === 0) {
                     $from = filter_var($range, FILTER_VALIDATE_INT);
                     if ($from !== false) {
-                        $endpointObject->setRange($from);
+                        $endpointObject->setQueryRange($from);
                     }
                 } elseif ($dashCount === 1) {
                     if (str_starts_with($range, '-')) {
                         $from = filter_var($range, FILTER_VALIDATE_INT);
                         if ($from !== false) {
-                            $endpointObject->setRange($from);
+                            $endpointObject->setQueryRange($from);
                         }
                     } else {
                         $parts = explode('-', $range);
                         $from  = filter_var($parts[0], FILTER_VALIDATE_INT);
                         $to    = filter_var($parts[1], FILTER_VALIDATE_INT);
                         if ($from !== false && $to !== false && $from < $to) {
-                            $endpointObject->setRange($from, $to);
+                            $endpointObject->setQueryRange($from, $to);
                         }
                     }
                 }
@@ -183,6 +183,7 @@ class Rest
         }
         try {
             $result = $endpointObject->run();
+            $endpointObject->setResponseRangeHeaders();
             if ($result === null) {
                 $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
             }

@@ -6,5 +6,5 @@ interface RangeInterface
 {
     public function getRangePrefix(): string;
     
-    public function setRange(int $from, ?int $to = null): void;
+    public function setQueryRange(int $from, ?int $to = null): void;
 }
