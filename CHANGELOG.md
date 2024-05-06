@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/byteshard/rest/compare/v1.1.1...v1.1.2) (2024-05-06)
+
+
+### Bug Fixes
+
+* prevent exception on empty parameters ([7bcddfb](https://github.com/byteshard/rest/commit/7bcddfbe4da10e0054e9afe10a97302b7b4f1c44))
+
 ## [1.1.1](https://github.com/byteshard/rest/compare/v1.1.0...v1.1.1) (2024-04-09)
 
 
