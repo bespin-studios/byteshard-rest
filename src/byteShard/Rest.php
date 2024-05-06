@@ -142,7 +142,7 @@ class Rest
 
     private function newStyleCall(string $location, string $className): void
     {
-        $parameters = $this->getParameters($location, true);
+        $parameters = $this->getParameters($location, true) ?? [];
         try {
             /** @var RestEndpoint $endpointObject */
             $endpointObject = new $className(...$parameters);
