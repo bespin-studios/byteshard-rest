@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/byteshard/rest/compare/v1.1.2...v1.2.0) (2024-05-10)
+
+
+### Features
+
+* add rest exception ([08b7013](https://github.com/byteshard/rest/commit/08b70132479c202c58f5720a3020b5554cd5da3c))
+
 ## [1.1.2](https://github.com/byteshard/rest/compare/v1.1.1...v1.1.2) (2024-05-06)
 
 
