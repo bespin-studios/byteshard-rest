@@ -13,6 +13,7 @@
 namespace byteShard;
 
 use byteShard\Enum\RestMethod;
+use byteShard\Rest\Exception\RestException;
 use byteShard\Rest\Location;
 use byteShard\Rest\Method;
 use byteShard\Rest\RangeInterface;
@@ -148,6 +149,9 @@ class Rest
             $endpointObject = new $className(...$parameters);
         } catch (Exception $e) {
             $this->logger?->error($e->getMessage());
+            if ($e instanceof RestException) {
+                $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => $e->getMessage()], httpResponseCode: $e->getHttpResponseCode());
+            }
             $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
         }
 
