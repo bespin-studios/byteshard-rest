@@ -21,6 +21,7 @@ use byteShard\Rest\RestEndpoint;
 use Exception;
 use Psr\Log\LoggerInterface;
 use stdClass;
+use Throwable;
 
 class Rest
 {
@@ -147,7 +148,7 @@ class Rest
         try {
             /** @var RestEndpoint $endpointObject */
             $endpointObject = new $className(...$parameters);
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->logger?->error($e->getMessage());
             if ($e instanceof RestException) {
                 $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => $e->getMessage()], httpResponseCode: $e->getHttpResponseCode());
@@ -192,8 +193,11 @@ class Rest
                 $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
             }
             $this->printClientResponse(response: $result, contentType: $endpointObject->getContentType(), httpResponseCode: $endpointObject->getReturnCode());
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->logger?->error($e->getMessage());
+            if ($e instanceof RestException) {
+                $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => $e->getMessage()], httpResponseCode: $e->getHttpResponseCode());
+            }
             $this->printClientResponse(response: ['state' => 'error', 'errorMessage' => 'an error occurred'], httpResponseCode: 404);
         }
     }
