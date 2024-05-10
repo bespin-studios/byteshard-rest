@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/byteshard/rest/compare/v1.2.0...v1.2.1) (2024-05-10)
+
+
+### Bug Fixes
+
+* catch Throwable to catch TypeError as well, support RestException in run() part ([e8c4556](https://github.com/byteshard/rest/commit/e8c4556c13d2af73ad7c7e4a7076ad437dacea07))
+
 # [1.2.0](https://github.com/byteshard/rest/compare/v1.1.2...v1.2.0) (2024-05-10)
 
 
