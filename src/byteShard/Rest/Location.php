@@ -55,7 +55,7 @@ class Location
         return null;
     }
 
-    public function addMethod(RestMethod $method, string $class, Closure $constructorCallback = null): void
+    public function addMethod(RestMethod $method, string $class, ?Closure $constructorCallback = null): void
     {
         $this->methods[$method->value]['class'] = $class;
         if ($constructorCallback !== null) {

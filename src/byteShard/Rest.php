@@ -37,6 +37,9 @@ class Rest
      */
     public function __construct(?LoggerInterface $logger = null)
     {
+        if (!array_key_exists('REQUEST_METHOD', $_SERVER) || !is_string($_SERVER['REQUEST_METHOD'])) {
+            throw new Exception('invalid HTTP method');
+        }
         $method = RestMethod::tryFrom(strtoupper($_SERVER['REQUEST_METHOD']));
         if ($method === null) {
             throw new Exception('invalid HTTP method '.$_SERVER['REQUEST_METHOD'].' must one of "'.implode('", "', array_column(RestMethod::cases(), 'value')).'"');
@@ -57,7 +60,9 @@ class Rest
         } elseif (array_key_exists('HTTP_AUTHORIZATION', $_SERVER)) {
             $clientToken = substr($_SERVER['HTTP_AUTHORIZATION'], 7);
         } else {
-            $this->logger?->alert('SECURITY: ['.$_SERVER['HTTP_X_REAL_IP'].'] invalid access.');
+            if (is_string($_SERVER['HTTP_X_REAL_IP'])) {
+                $this->logger?->alert('SECURITY: ['.$_SERVER['HTTP_X_REAL_IP'].'] invalid access.');
+            }
             header("HTTP/1.1 401 Unauthorized");
             exit;
         }
@@ -231,9 +236,9 @@ class Rest
 
     private function getGETParameters(string $location, bool $getAssociativeArray = false): mixed
     {
-        if (isset($_SERVER['QUERY_STRING'])) {
+        if (isset($_SERVER['QUERY_STRING']) && is_string($_SERVER['QUERY_STRING'])) {
             parse_str($_SERVER['QUERY_STRING'], $bodyParameters);
-            if (is_array($bodyParameters) && !empty($bodyParameters)) {
+            if (!empty($bodyParameters)) {
                 $locationFound = false;
                 $params        = $getAssociativeArray ? [] : new stdClass();
                 foreach ($bodyParameters as $key => $value) {
@@ -261,7 +266,7 @@ class Rest
     private function getBodyParameters(bool $getAssociativeArray = false): mixed
     {
         $contentType = '';
-        if (isset($_SERVER['CONTENT_TYPE'])) {
+        if (isset($_SERVER['CONTENT_TYPE']) && is_string($_SERVER['CONTENT_TYPE'])) {
             $contentType = $_SERVER['CONTENT_TYPE'];
         }
         $body = file_get_contents('php://input');
