@@ -1,3 +1,10 @@
+## [1.2.2](https://github.com/bespin-studios/byteshard-rest/compare/v1.2.1...v1.2.2) (2025-05-20)
+
+
+### Bug Fixes
+
+* pipeline and php 8.4 warnings ([4f8d868](https://github.com/bespin-studios/byteshard-rest/commit/4f8d868c8df619891ab9d8d1351a07cdad401e86))
+
 ## [1.2.1](https://github.com/byteshard/rest/compare/v1.2.0...v1.2.1) (2024-05-10)
 
 
