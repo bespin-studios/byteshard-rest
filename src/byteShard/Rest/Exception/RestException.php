@@ -10,7 +10,7 @@ class RestException extends Exception
 
     private int $httpResponseCode;
 
-    public function __construct(string $message = '', int $code = 10000000, string $method = '', Throwable $previous = null, int $statusCode = 500)
+    public function __construct(string $message = '', int $code = 10000000, string $method = '', ?Throwable $previous = null, int $statusCode = 500)
     {
         $this->httpResponseCode = $statusCode;
         parent::__construct($message, $code, $method, $previous);
